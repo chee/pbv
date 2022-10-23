@@ -3,6 +3,11 @@ import Cocoa
 import Foundation
 
 let newline = Data([0x0A] as [UInt8])
+let typemap = [
+ "html": "public.html",
+ "txt": "public.utf8-plain-text",
+ "png": "public.png"
+]
 
 /**
  Write the given string to STDERR.
@@ -16,6 +21,21 @@ func printErr(_ str: String, appendNewline: Bool = true) {
         FileHandle.standardError.write(data)
         if appendNewline {
             FileHandle.standardError.write(newline)
+        }
+    }
+}
+/**
+ Write the given string to STDOUT.
+
+ - parameter str: native string to write encode in utf-8.
+ - parameter appendNewline: whether or not to write a newline (U+000A) after the given string (defaults to true)
+ */
+func print(_ str: String, appendNewline: Bool = true) {
+    // writing to STDERR takes a bit of boilerplate, compared to print()
+    if let data = str.data(using: .utf8) {
+        FileHandle.standardOutput.write(data)
+        if appendNewline {
+            FileHandle.standardOutput.write(newline)
         }
     }
 }
@@ -56,7 +76,8 @@ func pasteboardData(_ pasteboard: NSPasteboard, dataTypeName: String) throws -> 
  */
 func bestPasteboardData(_ pasteboard: NSPasteboard, dataTypeNames: [String]) throws -> Data {
     for dataTypeName in dataTypeNames {
-        if let data = try? pasteboardData(pasteboard, dataTypeName: dataTypeName) {
+        let type = typemap[dataTypeName] ?? dataTypeName
+        if let data = try? pasteboardData(pasteboard, dataTypeName: type) {
             return data
         }
     }
@@ -89,15 +110,15 @@ func streamBestPasteboardData(_ pasteboard: NSPasteboard, dataTypeNames: [String
 }
 
 func printTypes(_ pasteboard: NSPasteboard) {
-    printErr("Available types for the '\(pasteboard.name.rawValue)' pasteboard:")
+    // printErr("Available types for the '\(pasteboard.name.rawValue)' pasteboard:")
     // Apple documentation says `types` "is an array NSString objects",
     // but that's wrong: they are PasteboardType structures.
     if let types = pasteboard.types {
         for type in types {
-            printErr("  \(type.rawValue)")
+            print("\(type.rawValue)")
         }
     } else {
-        printErr("  (not available)")
+        printErr("(not available)")
     }
 }
 
@@ -124,9 +145,8 @@ private func printUsage(_ pasteboard: NSPasteboard) {
       -h|--help    Show this help and exit
       -s|--stream  Start an infinite loop polling the Pasteboard 'changeCount',
                    running as usual whenever it changes
-
+      -t|--types   Print types of current clipboard content
     """)
-    printTypes(pasteboard)
 }
 
 // CLI entry point
@@ -142,15 +162,22 @@ func main() {
         exit(0)
     }
 
+    let typesIndex = args.firstIndex { arg in arg == "-t" || arg == "--types" }
+    if let index = typesIndex {
+        args.remove(at: index)
+    }
+
     let streamIndex = args.firstIndex { arg in arg == "-s" || arg == "--stream" }
     if let index = streamIndex {
         args.remove(at: index)
     }
 
     let types = args.isEmpty ? ["public.utf8-plain-text"] : args
-    if streamIndex != nil {
+    if typesIndex != nil {
+        printTypes(pasteboard)
+        exit(0)
+    } else if streamIndex != nil {
         let timer = streamBestPasteboardData(pasteboard, dataTypeNames: types)
-
         let runLoop = RunLoop.main
         runLoop.add(timer, forMode: .default)
         runLoop.run()
