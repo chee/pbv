@@ -1,5 +1,7 @@
 # macos-pasteboard
 
+fork of [chbrown's macos-pasteboard](https://github.com/chbrown/macos-pasteboard/)
+
 Like macOS's built-in `pbpaste` but more flexible and raw.
 
 
